@@ -1,0 +1,589 @@
+[
+  {
+    "model": "api.entitycluster",
+    "pk": 1,
+    "fields": {
+      "key": "research",
+      "label": "Research",
+      "description": "Research outputs and activities",
+      "sort_order": 1,
+      "enabled": true
+    }
+  },
+  {
+    "model": "api.entitycluster",
+    "pk": 2,
+    "fields": {
+      "key": "people-orgs",
+      "label": "People & Organisations",
+      "description": "Person and organisational unit authority entities",
+      "sort_order": 2,
+      "enabled": true
+    }
+  },
+  {
+    "model": "api.entitycluster",
+    "pk": 3,
+    "fields": {
+      "key": "other",
+      "label": "Other",
+      "description": "Events, equipment and journals",
+      "sort_order": 3,
+      "enabled": true
+    }
+  },
+  {
+    "model": "api.entitytypeentry",
+    "pk": 1,
+    "fields": {
+      "cluster": 1,
+      "entity_type_label": "Publication",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.entitytypeentry",
+    "pk": 2,
+    "fields": {
+      "cluster": 1,
+      "entity_type_label": "Project",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "api.entitytypeentry",
+    "pk": 3,
+    "fields": {
+      "cluster": 1,
+      "entity_type_label": "Funding",
+      "sort_order": 3
+    }
+  },
+  {
+    "model": "api.entitytypeentry",
+    "pk": 4,
+    "fields": {
+      "cluster": 1,
+      "entity_type_label": "Product",
+      "sort_order": 4
+    }
+  },
+  {
+    "model": "api.entitytypeentry",
+    "pk": 5,
+    "fields": {
+      "cluster": 1,
+      "entity_type_label": "Patent",
+      "sort_order": 5
+    }
+  },
+  {
+    "model": "api.entitytypeentry",
+    "pk": 6,
+    "fields": {
+      "cluster": 2,
+      "entity_type_label": "Person",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.entitytypeentry",
+    "pk": 7,
+    "fields": {
+      "cluster": 2,
+      "entity_type_label": "OrgUnit",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "api.entitytypeentry",
+    "pk": 8,
+    "fields": {
+      "cluster": 3,
+      "entity_type_label": "Event",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.entitytypeentry",
+    "pk": 9,
+    "fields": {
+      "cluster": 3,
+      "entity_type_label": "Equipment",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "api.entitytypeentry",
+    "pk": 10,
+    "fields": {
+      "cluster": 3,
+      "entity_type_label": "Journal",
+      "sort_order": 3
+    }
+  },
+  {
+    "model": "api.quickpreset",
+    "pk": 1,
+    "fields": {
+      "key": "publication",
+      "label": "Publication",
+      "description": "Publications filtered by type, year and author.",
+      "base_filters": {
+        "entityType": [
+          "Publication"
+        ]
+      },
+      "sort_order": 1,
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.quickpreset",
+    "pk": 2,
+    "fields": {
+      "key": "project",
+      "label": "Project",
+      "description": "Projects filtered by investigator, coordinator, status, and dates.",
+      "base_filters": {
+        "entityType": [
+          "Project"
+        ]
+      },
+      "sort_order": 2,
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.quickpreset",
+    "pk": 3,
+    "fields": {
+      "key": "funding",
+      "label": "Funding",
+      "description": "Funding items filtered by type and funder.",
+      "base_filters": {
+        "entityType": [
+          "Funding"
+        ]
+      },
+      "sort_order": 3,
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.quickpreset",
+    "pk": 4,
+    "fields": {
+      "key": "person",
+      "label": "Person",
+      "description": "Person entities filtered by affiliation.",
+      "base_filters": {
+        "entityType": [
+          "Person"
+        ]
+      },
+      "sort_order": 4,
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.quickpreset",
+    "pk": 5,
+    "fields": {
+      "key": "orgunit",
+      "label": "OrgUnit",
+      "description": "Organisational units filtered by type and country.",
+      "base_filters": {
+        "entityType": [
+          "OrgUnit"
+        ]
+      },
+      "sort_order": 5,
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.quickpreset",
+    "pk": 6,
+    "fields": {
+      "key": "equipment",
+      "label": "Equipment",
+      "description": "Equipment entities filtered by type.",
+      "base_filters": {
+        "entityType": [
+          "Equipment"
+        ]
+      },
+      "sort_order": 6,
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.quickpreset",
+    "pk": 7,
+    "fields": {
+      "key": "event",
+      "label": "Event",
+      "description": "Events filtered by type and dates.",
+      "base_filters": {
+        "entityType": [
+          "Event"
+        ]
+      },
+      "sort_order": 7,
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.quickpreset",
+    "pk": 8,
+    "fields": {
+      "key": "product",
+      "label": "Product",
+      "description": "Product (dataset) entities.",
+      "base_filters": {
+        "entityType": [
+          "Product"
+        ]
+      },
+      "sort_order": 8,
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.quickpreset",
+    "pk": 9,
+    "fields": {
+      "key": "patent",
+      "label": "Patent",
+      "description": "Patent entities.",
+      "base_filters": {
+        "entityType": [
+          "Patent"
+        ]
+      },
+      "sort_order": 9,
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.quickpreset",
+    "pk": 10,
+    "fields": {
+      "key": "journal",
+      "label": "Journal",
+      "description": "Journal entities.",
+      "base_filters": {
+        "entityType": [
+          "Journal"
+        ]
+      },
+      "sort_order": 10,
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 1,
+    "fields": {
+      "preset": 1,
+      "key": "dc.type",
+      "label": "Type",
+      "facet_name": "dc.type",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 2,
+    "fields": {
+      "preset": 1,
+      "key": "dc.date.issued",
+      "label": "Year",
+      "facet_name": "dc.date.issued",
+      "kind": "date",
+      "placeholder": "",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 3,
+    "fields": {
+      "preset": 1,
+      "key": "dc.contributor.author",
+      "label": "Author",
+      "facet_name": "dc.contributor.author",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 3
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 4,
+    "fields": {
+      "preset": 2,
+      "key": "crispj.investigator",
+      "label": "Investigator",
+      "facet_name": "crispj.investigator",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 5,
+    "fields": {
+      "preset": 2,
+      "key": "crispj.coordinator",
+      "label": "Coordinator",
+      "facet_name": "crispj.coordinator",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 6,
+    "fields": {
+      "preset": 2,
+      "key": "oairecerif.project.status",
+      "label": "Status",
+      "facet_name": "oairecerif.project.status",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 3
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 7,
+    "fields": {
+      "preset": 2,
+      "key": "oairecerif.project.startDate",
+      "label": "Start date",
+      "facet_name": "oairecerif.project.startDate",
+      "kind": "date",
+      "placeholder": "",
+      "sort_order": 4
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 8,
+    "fields": {
+      "preset": 2,
+      "key": "oairecerif.project.endDate",
+      "label": "End date",
+      "facet_name": "oairecerif.project.endDate",
+      "kind": "date",
+      "placeholder": "",
+      "sort_order": 5
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 9,
+    "fields": {
+      "preset": 3,
+      "key": "itemtype",
+      "label": "Type",
+      "facet_name": "itemtype",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 10,
+    "fields": {
+      "preset": 3,
+      "key": "oairecerif.funder",
+      "label": "Funder",
+      "facet_name": "oairecerif.funder",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 11,
+    "fields": {
+      "preset": 4,
+      "key": "person.affiliation.name",
+      "label": "Affiliation",
+      "facet_name": "person.affiliation.name",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 12,
+    "fields": {
+      "preset": 5,
+      "key": "dc.type",
+      "label": "Type",
+      "facet_name": "dc.type",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 13,
+    "fields": {
+      "preset": 5,
+      "key": "organization.address.addressCountry",
+      "label": "Country",
+      "facet_name": "organization.address.addressCountry",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 14,
+    "fields": {
+      "preset": 6,
+      "key": "itemtype",
+      "label": "Type",
+      "facet_name": "itemtype",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 15,
+    "fields": {
+      "preset": 7,
+      "key": "itemtype",
+      "label": "Type",
+      "facet_name": "itemtype",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 16,
+    "fields": {
+      "preset": 7,
+      "key": "oairecerif.event.startDate",
+      "label": "Start date",
+      "facet_name": "oairecerif.event.startDate",
+      "kind": "date",
+      "placeholder": "",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 17,
+    "fields": {
+      "preset": 7,
+      "key": "oairecerif.event.endDate",
+      "label": "End date",
+      "facet_name": "oairecerif.event.endDate",
+      "kind": "date",
+      "placeholder": "",
+      "sort_order": 3
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 18,
+    "fields": {
+      "preset": 8,
+      "key": "dc.type",
+      "label": "Type",
+      "facet_name": "dc.type",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 19,
+    "fields": {
+      "preset": 8,
+      "key": "dc.contributor.author",
+      "label": "Author",
+      "facet_name": "dc.contributor.author",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 20,
+    "fields": {
+      "preset": 9,
+      "key": "dc.contributor.author",
+      "label": "Inventor",
+      "facet_name": "dc.contributor.author",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.quickpresetfilter",
+    "pk": 21,
+    "fields": {
+      "preset": 10,
+      "key": "dc.publisher",
+      "label": "Publisher",
+      "facet_name": "dc.publisher",
+      "kind": "text",
+      "placeholder": "",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "api.sitesettings",
+    "pk": 1,
+    "fields": {
+      "quicklinks_enabled": true,
+      "communities_creation_enabled": true,
+      "communities_role_management_enabled": true,
+      "updated_at": "2026-01-01T00:00:00Z",
+      "collections_creation_enabled": true
+    }
+  }
+]
