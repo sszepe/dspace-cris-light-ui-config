@@ -9,7 +9,8 @@ ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1,django").sp
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
     "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
-    "rest_framework", "corsheaders", "django_filters", "drf_spectacular", "api",
+    "rest_framework", "corsheaders", "django_filters", "drf_spectacular", "api", "cockpit",
+    "cris_layout",
 ]
 
 MIDDLEWARE = [
@@ -50,14 +51,14 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ["api.authentication.DSpaceJWTAuthentication"],
+    "DEFAULT_AUTHENTICATION_CLASSES": ["cockpit.authentication.CockpitSessionAuthentication","api.authentication.DSpaceJWTAuthentication"],
     "DEFAULT_PERMISSION_CLASSES":     ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES":       ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_FILTER_BACKENDS":        ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_SCHEMA_CLASS":           "drf_spectacular.openapi.AutoSchema",
 }
 
-_cors = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:4000")
+_cors = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:4000,http://localhost:5174")
 CORS_ALLOWED_ORIGINS   = [o.strip() for o in _cors.split(",") if o.strip()]
 CORS_ALLOW_CREDENTIALS = True
 DSPACE_BASE_URL = os.environ.get("DSPACE_BASE_URL", "http://localhost:8080/server")
@@ -67,9 +68,32 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # drf-spectacular (OpenAPI schema generation)
 SPECTACULAR_SETTINGS = {
-    "TITLE": "DSpace CRIS Cockpit API",
-    "DESCRIPTION": "Config API for the DSpace CRIS Cockpit frontend.",
+    "TITLE": "DSpace CRIS Config API",
+    "DESCRIPTION": (
+        "Configuration API for the DSpace CRIS light client.\n\n"
+        "Authentication uses a bearer token issued by DSpace and passed as:\n"
+        "`Authorization: Bearer <token>`"
+    ),
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api/dspace-config",
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,
+        "displayRequestDuration": True,
+        "docExpansion": "list",
+    },
+    "TAGS": [
+        {"name": "auth", "description": "Authentication and diagnostics"},
+        {"name": "dashboard", "description": "Dashboard configuration"},
+        {"name": "clusters", "description": "Dashboard entity clusters"},
+        {"name": "site-settings", "description": "Global UI feature flags"},
+        {"name": "collection-mappings", "description": "Entity type to collection mapping rules"},
+        {"name": "quickpresets", "description": "Quicklink preset configuration"},
+        {"name": "submission-forms", "description": "Imported submission forms"},
+        {"name": "submission-processes", "description": "Imported submission processes"},
+        {"name": "form-layouts", "description": "Form layout overrides"},
+        {"name": "metadata", "description": "Metadata registry lookup"},
+        {"name": "audit", "description": "Audit and reporting endpoints"},
+    ],
 }

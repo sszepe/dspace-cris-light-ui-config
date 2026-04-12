@@ -3,8 +3,10 @@ from .models import (
     EntityCluster, EntityTypeEntry,
     QuickPreset, QuickPresetFilter,
     SiteSettings,
+    CollectionMapping,
     MetadataSchema, MetadataField,
     SubmissionForm, SubmissionFormField,
+    SubmissionStepDefinition, SubmissionProcess, SubmissionProcessStep,
     FormLayout, FormSection, FormFieldOverride, FormConditionalBlock,
 )
 
@@ -54,6 +56,30 @@ class SiteSettingsAdmin(admin.ModelAdmin):
         return not SiteSettings.objects.exists()
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# ── Collection mapping ────────────────────────────────────────────────────────
+
+@admin.register(CollectionMapping)
+class CollectionMappingAdmin(admin.ModelAdmin):
+    list_display  = ["entity_type", "sort_order", "collection_id", "label",
+                     "dc_type_includes", "risfunding_status_in", "updated_at"]
+    list_editable = ["sort_order"]
+    list_filter   = ["entity_type"]
+    search_fields = ["entity_type", "collection_id", "label"]
+    ordering      = ["sort_order", "entity_type"]
+    fieldsets     = [
+        (None, {
+            "fields": ["entity_type", "collection_id", "label", "sort_order"],
+        }),
+        ("Conditions (leave blank to match all)", {
+            "fields": ["dc_type_includes", "risfunding_status_in"],
+            "description": (
+                "dc_type_includes: JSON list of dc.type substrings, e.g. [\"Grant\", \"Scholarship\"]. "
+                "risfunding_status_in: JSON list of exact statuses, e.g. [\"approved\"]."
+            ),
+        }),
+    ]
 
 
 # ── Metadata registry (read-only in admin — imported via management command) ──
@@ -129,6 +155,54 @@ class SubmissionFormAdmin(admin.ModelAdmin):
     def field_count(self, obj):
         return obj.fields.count()
     field_count.short_description = "Fields"
+
+    def has_add_permission(self, request):
+        return False
+
+
+# ── Submission processes (read-only — imported via management command) ────────
+
+@admin.register(SubmissionStepDefinition)
+class SubmissionStepDefinitionAdmin(admin.ModelAdmin):
+    list_display    = ["step_id", "type", "mandatory", "scope", "heading", "imported_at"]
+    search_fields   = ["step_id", "type", "heading", "processing_class"]
+    list_filter     = ["type", "mandatory"]
+    ordering        = ["step_id"]
+    readonly_fields = ["step_id", "heading", "processing_class", "type",
+                       "mandatory", "scope", "imported_at"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class SubmissionProcessStepInline(admin.TabularInline):
+    model           = SubmissionProcessStep
+    extra           = 0
+    fields          = ["sort_order", "step_id", "definition"]
+    readonly_fields = ["sort_order", "step_id", "definition"]
+    ordering        = ["sort_order"]
+    can_delete      = False
+    max_num         = 0
+    show_change_link = True
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SubmissionProcess)
+class SubmissionProcessAdmin(admin.ModelAdmin):
+    list_display    = ["name", "step_count", "imported_at"]
+    search_fields   = ["name"]
+    ordering        = ["name"]
+    readonly_fields = ["name", "imported_at"]
+    inlines         = [SubmissionProcessStepInline]
+
+    def step_count(self, obj):
+        return obj.steps.count()
+    step_count.short_description = "Steps"
 
     def has_add_permission(self, request):
         return False

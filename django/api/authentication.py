@@ -3,6 +3,7 @@ import requests
 from django.conf import settings
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
 
 class DSpaceUser:
     is_authenticated = True
@@ -38,3 +39,16 @@ class DSpaceJWTAuthentication(BaseAuthentication):
         groups = [g.get("name","") for g in data.get("_embedded",{}).get("specialGroups",[])]
         return (DSpaceUser(email or name, name, groups), token)
     def authenticate_header(self, request): return "Bearer"
+
+
+class DSpaceJWTAuthenticationScheme(OpenApiAuthenticationExtension):
+    target_class = "api.authentication.DSpaceJWTAuthentication"
+    name = "BearerAuth"
+
+    def get_security_definition(self, auto_schema):
+        return {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Paste the DSpace JWT token here.",
+        }

@@ -1,13 +1,22 @@
 """
 Management command: import_plain_config
 
-Imports plain DSpace CRIS config into Django:
-  1. Metadata registry  — MetadataSchema + MetadataField (498 unique fields)
-  2. Submission forms   — SubmissionForm + SubmissionFormField (30 forms)
+Imports plain DSpace CRIS config into Django from the frontend TS config directory.
+All three import steps read from the same --config-dir mount:
 
-Key fix: uses brace-matched extraction for each field object so qualifier is
-read only from within the current field's own {} — not from the next sibling.
-This eliminates all duplicate (schema, element, qualifier) constraint violations.
+  1. Metadata registry     — MetadataSchema + MetadataField
+                             Source: <config-dir>/metadata-registry-config.ts
+
+  2. Submission forms      — SubmissionForm + SubmissionFormField
+                             Source: <config-dir>/submission-config.ts
+                             (reads the form field definitions from SUBMISSION_PROCESSES)
+
+  3. Submission processes  — SubmissionStepDefinition + SubmissionProcess + SubmissionProcessStep
+                             Source: <config-dir>/submission-config.ts
+                             (reads the process→step structure from SUBMISSION_PROCESSES)
+
+No XML files are needed — submission-config.ts is auto-generated from item-submission.xml
+and submission-forms.xml and already contains all the information.
 
 Safe to re-run — uses update_or_create throughout.
 
@@ -15,27 +24,40 @@ Usage:
     python manage.py import_plain_config [--config-dir PATH] [--clear]
     python manage.py import_plain_config --skip-metadata
     python manage.py import_plain_config --skip-forms
+    python manage.py import_plain_config --skip-processes
 """
 import os, re, json
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from api.models import MetadataSchema, MetadataField, SubmissionForm, SubmissionFormField
+from api.models import (
+    MetadataSchema, MetadataField,
+    SubmissionForm, SubmissionFormField,
+    SubmissionStepDefinition, SubmissionProcess, SubmissionProcessStep,
+)
 
 
 class Command(BaseCommand):
     help = "Import plain DSpace CRIS config into Django."
 
     def add_arguments(self, parser):
-        parser.add_argument("--config-dir", default="/app/frontend-config")
+        parser.add_argument(
+            "--config-dir", default="/app/frontend-config",
+            help="Path to the frontend TS config directory (submission-config.ts, metadata-registry-config.ts).",
+        )
         parser.add_argument("--clear", action="store_true",
                             help="Clear existing records before importing.")
-        parser.add_argument("--skip-metadata", action="store_true")
-        parser.add_argument("--skip-forms", action="store_true")
+        parser.add_argument("--skip-metadata",   action="store_true")
+        parser.add_argument("--skip-forms",      action="store_true")
+        parser.add_argument("--skip-processes",  action="store_true",
+                            help="Skip importing submission processes from submission-config.ts")
 
     def handle(self, *args, **options):
         config_dir = options["config_dir"]
         self.stdout.write(f"[import_plain_config] config-dir: {config_dir}")
         if options["clear"]:
+            SubmissionProcessStep.objects.all().delete()
+            SubmissionProcess.objects.all().delete()
+            SubmissionStepDefinition.objects.all().delete()
             SubmissionFormField.objects.all().delete()
             SubmissionForm.objects.all().delete()
             MetadataField.objects.all().delete()
@@ -45,6 +67,8 @@ class Command(BaseCommand):
             self._import_metadata(config_dir)
         if not options["skip_forms"]:
             self._import_forms(config_dir)
+        if not options["skip_processes"]:
+            self._import_processes(config_dir)
 
     # ── Metadata registry ─────────────────────────────────────────────────────
 
@@ -222,6 +246,175 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(
             f"Submission forms: {len(form_objs)} forms, {field_count} fields imported."
+        ))
+
+    # ── Submission processes (submission-config.ts) ───────────────────────────
+
+    def _import_processes(self, config_dir: str):
+        """
+        Parse SUBMISSION_PROCESSES from submission-config.ts and import:
+          Each step's definition fields  → SubmissionStepDefinition (upserted by step_id)
+          Each top-level process         → SubmissionProcess
+          Each step reference            → SubmissionProcessStep (ordered)
+
+        submission-config.ts is auto-generated from item-submission.xml +
+        submission-forms.xml, so all step metadata is already present inline.
+
+        Parsing strategy: track brace depth against the raw file using absolute
+        positions.  Top-level process entries sit at depth 2 of the file
+        (depth 1 = outer Record literal, depth 2 = each process value object).
+        When we enter depth 2 we extract the whole process object via
+        abs_bracket_end(), harvest its steps, then jump i past the object so
+        depth resets to 1 cleanly — avoiding the off-by-one errors that
+        occur when working on extracted substrings.
+        """
+        path = os.path.join(config_dir, "submission-config.ts")
+        if not os.path.exists(path):
+            self.stderr.write(f"Not found: {path}")
+            return
+
+        with open(path, encoding="utf-8-sig") as f:
+            raw = f.read()
+
+        # ── 1. Find SUBMISSION_PROCESSES opening brace ────────────────────────
+        proc_start = raw.find("export const SUBMISSION_PROCESSES")
+        if proc_start < 0:
+            self.stderr.write("SUBMISSION_PROCESSES not found in submission-config.ts")
+            return
+        eq_pos = raw.find("=", proc_start)
+        brace_start = eq_pos + raw[eq_pos:].index("{")
+
+        # ── 2. Absolute brace-match helper ────────────────────────────────────
+        def abs_bracket_end(start_pos: int, oc: str, cc: str) -> int:
+            """Return index AFTER the closing bracket matching raw[start_pos]."""
+            depth = 0
+            i = start_pos
+            while i < len(raw):
+                if raw[i] == oc:
+                    depth += 1
+                elif raw[i] == cc:
+                    depth -= 1
+                    if depth == 0:
+                        return i + 1
+                i += 1
+            return len(raw)
+
+        # ── 3. Walk depth-1 of the outer Record object ────────────────────────
+        step_defs: dict[str, dict] = {}   # step_id → definition fields
+        processes: dict[str, list] = {}   # process_name → [step_id, ...]
+
+        depth = 0
+        i = brace_start
+        while i < len(raw):
+            c = raw[i]
+            if c == "{":
+                depth += 1
+                if depth == 2:
+                    # Entering a top-level process value object.
+                    # Look back up to 200 chars for the key name.
+                    pre = raw[max(0, i - 200): i]
+                    km = re.search(
+                        r'(?:,|\{)\s*(?:"([^"]+)"|([A-Za-z_$][A-Za-z0-9_$-]*))\s*:\s*$',
+                        pre,
+                    )
+                    proc_name = (km.group(1) or km.group(2)) if km else None
+
+                    proc_end = abs_bracket_end(i, "{", "}")
+                    proc_obj = raw[i: proc_end]
+
+                    if proc_name:
+                        step_ids_for_proc: list[str] = []
+                        steps_m = re.search(r"\bsteps\s*:\s*\[", proc_obj)
+                        if steps_m:
+                            arr_abs = i + steps_m.end() - 1
+                            arr_end = abs_bracket_end(arr_abs, "[", "]")
+                            steps_arr = raw[arr_abs: arr_end]
+
+                            k = 1
+                            while k < len(steps_arr) - 1:
+                                if steps_arr[k] == "{":
+                                    step_obj, step_end = self._bracket(steps_arr, k, "{", "}")
+                                    step_id  = self._sv(step_obj, "id") or ""
+                                    heading  = self._sv(step_obj, "heading") or ""
+                                    type_    = self._sv(step_obj, "type") or ""
+                                    p_class  = self._sv(step_obj, "processingClass") or ""
+                                    mand_m   = re.search(r"\bmandatory\s*:\s*(true|false)", step_obj)
+                                    mandatory = (mand_m.group(1) == "true") if mand_m else True
+
+                                    if step_id:
+                                        step_ids_for_proc.append(step_id)
+                                        if step_id not in step_defs:
+                                            step_defs[step_id] = {
+                                                "heading":          heading,
+                                                "processing_class": p_class,
+                                                "type":             type_,
+                                                "mandatory":        mandatory,
+                                                "scope":            "",
+                                            }
+                                        else:
+                                            # Backfill any blank fields from later occurrences
+                                            ex = step_defs[step_id]
+                                            if not ex["heading"]          and heading:  ex["heading"]          = heading
+                                            if not ex["processing_class"] and p_class:  ex["processing_class"] = p_class
+                                            if not ex["type"]             and type_:    ex["type"]             = type_
+                                    k = step_end
+                                else:
+                                    k += 1
+
+                        processes[proc_name] = step_ids_for_proc
+
+                    # Jump past the entire process object; reset depth to 1.
+                    i = proc_end
+                    depth = 1
+                    continue
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+
+        self.stdout.write(f"Step definitions collected: {len(step_defs)}")
+        self.stdout.write(f"Submission processes collected: {len(processes)}")
+
+        # ── 4. Persist step definitions ───────────────────────────────────────
+        with transaction.atomic():
+            step_def_objs: dict[str, SubmissionStepDefinition] = {}
+            for sid, data in step_defs.items():
+                obj, _ = SubmissionStepDefinition.objects.update_or_create(
+                    step_id=sid, defaults=data,
+                )
+                step_def_objs[sid] = obj
+
+        self.stdout.write(self.style.SUCCESS(
+            f"Step definitions: {len(step_def_objs)} imported."
+        ))
+
+        # ── 5. Persist processes + steps ──────────────────────────────────────
+        proc_count = 0
+        step_count = 0
+        with transaction.atomic():
+            for name, step_ids in processes.items():
+                proc_obj, _ = SubmissionProcess.objects.update_or_create(name=name)
+
+                # Remove any steps no longer in the TS
+                existing_ids = set(proc_obj.steps.values_list("step_id", flat=True))
+                incoming_ids = set(step_ids)
+                proc_obj.steps.filter(step_id__in=existing_ids - incoming_ids).delete()
+
+                for idx, sid in enumerate(step_ids):
+                    SubmissionProcessStep.objects.update_or_create(
+                        process=proc_obj,
+                        sort_order=idx,
+                        defaults={
+                            "step_id":    sid,
+                            "definition": step_def_objs.get(sid),
+                        },
+                    )
+                    step_count += 1
+                proc_count += 1
+
+        self.stdout.write(self.style.SUCCESS(
+            f"Submission processes: {proc_count} processes, {step_count} steps imported."
         ))
 
     # ── Parsing helpers ───────────────────────────────────────────────────────

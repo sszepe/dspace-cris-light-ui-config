@@ -21,6 +21,10 @@ urlpatterns = [
     # ── Site settings ─────────────────────────────────────────────────────────
     path("site-settings/",                        views.SiteSettingsView.as_view(),               name="site-settings"),
 
+    # ── Collection mappings ───────────────────────────────────────────────────
+    path("collection-mappings/",                  views.CollectionMappingListCreateView.as_view(), name="collection-mapping-list"),
+    path("collection-mappings/<int:pk>/",         views.CollectionMappingDetailView.as_view(),     name="collection-mapping-detail"),
+
     # ── Quicklinks ───────────────────────────────────────────────────────────
     path("quicklinks/",                           views.QuicklinksConfigView.as_view(),           name="quicklinks-config"),
     path("quicklinks/presets/",                   views.QuickPresetListCreateView.as_view(),      name="quicklinks-presets"),
@@ -33,22 +37,24 @@ urlpatterns = [
     # ── Submission forms (read-only, populated by import_plain_config) ────────
     path("submission-forms/",                     views.SubmissionFormListView.as_view(),         name="submission-form-list"),
     path("submission-forms/<int:pk>/",            views.SubmissionFormDetailView.as_view(),       name="submission-form-detail"),
+    path("submission-forms/<int:form_id>/fields/",views.SubmissionFormFieldListView.as_view(),    name="submission-form-fields"),
+
+    # ── Submission processes (read-only, populated by import_plain_config) ───
+    path("submission-step-definitions/",          views.SubmissionStepDefinitionListView.as_view(),   name="submission-step-definition-list"),
+    path("submission-step-definitions/<int:pk>/", views.SubmissionStepDefinitionDetailView.as_view(), name="submission-step-definition-detail"),
+    path("submission-processes/",                 views.SubmissionProcessListView.as_view(),           name="submission-process-list"),
+    path("submission-processes/<int:pk>/",        views.SubmissionProcessDetailView.as_view(),         name="submission-process-detail"),
 
     # ── Form layouts ──────────────────────────────────────────────────────────
     path("form-layouts/",                         views.FormLayoutListCreateView.as_view(),       name="form-layout-list"),
     path("form-layouts/<int:pk>/",                views.FormLayoutDetailView.as_view(),           name="form-layout-detail"),
 
-
     # ── Metadata registry (read-only, for field autocomplete in form-builder) ──
-    path("metadata-schemas/",                     views.MetadataSchemaListView.as_view(),        name="metadata-schema-list"),
-    path("metadata-schemas/<int:pk>/",            views.MetadataSchemaDetailView.as_view(),      name="metadata-schema-detail"),
-    path("metadata-fields/",                      views.MetadataFieldListView.as_view(),          name="metadata-field-list"),
-
-    # ── Submission form field detail with metadata registry annotation ─────────
-    path("submission-forms/<int:form_id>/fields/",views.SubmissionFormFieldListView.as_view(),   name="submission-form-fields"),
+    path("metadata-schemas/",                     views.MetadataSchemaListView.as_view(),         name="metadata-schema-list"),
+    path("metadata-schemas/<int:pk>/",            views.MetadataSchemaDetailView.as_view(),       name="metadata-schema-detail"),
+    path("metadata-fields/",                      views.MetadataFieldListView.as_view(),           name="metadata-field-list"),
 
     # ── Audit ─────────────────────────────────────────────────────────────────
-
-    path("audit/field-usage/",                    views.audit_field_usage,                       name="audit-field-usage"),
-    path("audit/forms-summary/",                  views.audit_forms_summary,                     name="audit-forms-summary"),
+    path("audit/field-usage/",                    views.audit_field_usage,                        name="audit-field-usage"),
+    path("audit/forms-summary/",                  views.audit_forms_summary,                      name="audit-forms-summary"),
 ]

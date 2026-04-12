@@ -63,6 +63,45 @@ class SiteSettings(models.Model):
         return obj
 
 
+# ── Collection mapping ────────────────────────────────────────────────────────
+#
+# Mirrors the STATIC_COLLECTION_RULES array in collection-mapping.ts.
+# Rules are evaluated in sort_order; the first matching rule wins.
+
+class CollectionMapping(models.Model):
+    entity_type   = models.CharField(max_length=200,
+                                      help_text="DSpace entity type, e.g. 'Funding', 'OrgUnit'")
+    collection_id = models.CharField(max_length=200,
+                                      help_text="Target DSpace collection UUID")
+    label         = models.CharField(max_length=300, blank=True, default="",
+                                      help_text="Human-readable description shown in admin UI")
+    # Conditions (stored as JSON; null means 'match all')
+    dc_type_includes      = models.JSONField(
+        default=list, blank=True,
+        help_text="dc.type must contain any of these strings (case-insensitive)")
+    risfunding_status_in  = models.JSONField(
+        default=list, blank=True,
+        help_text="risfunding.status must equal one of these values")
+    sort_order    = models.PositiveIntegerField(default=0,
+                                                help_text="Rules are evaluated in ascending order; first match wins")
+    created_at    = models.DateTimeField(auto_now_add=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering     = ["sort_order", "entity_type"]
+        verbose_name = "Collection Mapping"
+        verbose_name_plural = "Collection Mappings"
+
+    def __str__(self):
+        conds = []
+        if self.dc_type_includes:
+            conds.append(f"dc.type∈{self.dc_type_includes}")
+        if self.risfunding_status_in:
+            conds.append(f"status∈{self.risfunding_status_in}")
+        suffix = f" [{', '.join(conds)}]" if conds else ""
+        return f"{self.entity_type} → {self.collection_id}{suffix}"
+
+
 # ── Metadata registry ─────────────────────────────────────────────────────────
 
 class MetadataSchema(models.Model):
@@ -133,6 +172,79 @@ class SubmissionFormField(models.Model):
                                           help_text="Resolved child form for group fields")
     class Meta: ordering = ["row", "col"]
     def __str__(self): return f"{self.form.name}[{self.row},{self.col}] {self.field or self.input_type}"
+
+
+# ── Submission processes ──────────────────────────────────────────────────────
+#
+# Mirrors item-submission.xml:
+#   <step-definitions>  → SubmissionStepDefinition (read-only, imported)
+#   <submission-definitions>/<submission-process>  → SubmissionProcess + SubmissionProcessStep
+
+class SubmissionStepDefinition(models.Model):
+    """One <step-definition> from item-submission.xml."""
+    SCOPE_CHOICES = [
+        ("submission", "Submission"),
+        ("workflow",   "Workflow"),
+        ("both",       "Both"),
+    ]
+    step_id          = models.CharField(max_length=200, unique=True,
+                                         help_text="The @id attribute, e.g. 'publication'")
+    heading          = models.CharField(max_length=500, blank=True, default="",
+                                         help_text="i18n key, e.g. submit.progressbar.describe.publication")
+    processing_class = models.CharField(max_length=500, blank=True, default="")
+    type             = models.CharField(max_length=100, blank=True, default="",
+                                         help_text="step type, e.g. submission-form, upload, license")
+    mandatory        = models.BooleanField(default=True)
+    scope            = models.CharField(max_length=20, choices=SCOPE_CHOICES,
+                                         blank=True, default="",
+                                         help_text="Scope visibility restriction if any")
+    imported_at      = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering       = ["step_id"]
+        verbose_name   = "Step Definition"
+        verbose_name_plural = "Step Definitions"
+
+    def __str__(self):
+        return self.step_id
+
+
+class SubmissionProcess(models.Model):
+    """One <submission-process> from item-submission.xml."""
+    name        = models.CharField(max_length=200, unique=True,
+                                    help_text="The @name attribute, e.g. 'publication'")
+    imported_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering       = ["name"]
+        verbose_name   = "Submission Process"
+        verbose_name_plural = "Submission Processes"
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def step_count(self):
+        return self.steps.count()
+
+
+class SubmissionProcessStep(models.Model):
+    """One <step id="…"/> inside a <submission-process>."""
+    process    = models.ForeignKey(SubmissionProcess, on_delete=models.CASCADE,
+                                    related_name="steps")
+    sort_order = models.PositiveIntegerField(default=0)
+    step_id    = models.CharField(max_length=200,
+                                   help_text="References SubmissionStepDefinition.step_id")
+    # Resolved FK — null if the step_id is not in step-definitions (e.g. detect-duplicate)
+    definition = models.ForeignKey(SubmissionStepDefinition, null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name="process_steps")
+
+    class Meta:
+        ordering       = ["sort_order"]
+        unique_together = [("process", "sort_order")]
+
+    def __str__(self):
+        return f"{self.process.name}[{self.sort_order}] → {self.step_id}"
 
 
 # ── Form layout overrides ─────────────────────────────────────────────────────

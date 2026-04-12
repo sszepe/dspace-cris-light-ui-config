@@ -30,8 +30,8 @@ def set_applied(app, names):
                 [app, name]
             )
 
-# The canonical single migration after squash
-CANONICAL = ['0001_initial']
+# The canonical migrations
+CANONICAL = ['0001_initial', '0002_submissionprocess_submissionstepdefinition_and_more', '0003_collectionmapping']
 
 applied = get_applied('api')
 tables_exist = table_exists('api_entitycluster')
@@ -65,7 +65,7 @@ else:
     print('[django] Seed data already present, skipping.')
 "
 
-echo "[django] Importing plain profile config (metadata + submission forms)..."
+echo "[django] Importing plain profile config (metadata + submission forms + processes)..."
 python manage.py shell -c "
 from api.models import MetadataField
 import os
