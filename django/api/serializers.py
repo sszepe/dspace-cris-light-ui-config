@@ -62,18 +62,13 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
 # ── Collection mapping ────────────────────────────────────────────────────────
 
 class CollectionMappingSerializer(serializers.ModelSerializer):
-    """
-    Read serializer — exposes the camelCase shape the TS client expects:
-      { entity_type, collection_id, label, conditions: { dcTypeIncludes, risfundingStatusIn } }
-    """
+    """Read serializer — surfaces conditions as { dcTypeIncludes, risfundingStatusIn }."""
     conditions = serializers.SerializerMethodField()
 
     class Meta:
         model  = CollectionMapping
-        fields = [
-            "id", "entity_type", "collection_id", "label",
-            "conditions", "sort_order", "created_at", "updated_at",
-        ]
+        fields = ["id", "entity_type", "collection_id", "label",
+                  "conditions", "sort_order", "created_at", "updated_at"]
 
     def get_conditions(self, obj):
         dc   = obj.dc_type_includes or []
@@ -81,57 +76,36 @@ class CollectionMappingSerializer(serializers.ModelSerializer):
         if not dc and not stat:
             return None
         out = {}
-        if dc:   out["dcTypeIncludes"]      = dc
-        if stat: out["risfundingStatusIn"]  = stat
+        if dc:   out["dcTypeIncludes"]     = dc
+        if stat: out["risfundingStatusIn"] = stat
         return out
 
 
 class CollectionMappingWriteSerializer(serializers.ModelSerializer):
-    """
-    Write serializer — accepts both camelCase (from TS) and snake_case.
-    Handles the nested `conditions` object as well as flat fields.
-    """
-    # Accept camelCase aliases from the TS client
-    entityType   = serializers.CharField(source="entity_type",   required=False)
-    collectionId = serializers.CharField(source="collection_id", required=False)
-    dcTypeIncludes     = serializers.ListField(
-        child=serializers.CharField(), source="dc_type_includes",
-        required=False, default=list,
-    )
-    risfundingStatusIn = serializers.ListField(
-        child=serializers.CharField(), source="risfunding_status_in",
-        required=False, default=list,
-    )
+    """Write serializer — accepts camelCase aliases and nested conditions."""
+    entityType         = serializers.CharField(source="entity_type",         required=False)
+    collectionId       = serializers.CharField(source="collection_id",       required=False)
+    dcTypeIncludes     = serializers.ListField(child=serializers.CharField(),
+                             source="dc_type_includes",     required=False, default=list)
+    risfundingStatusIn = serializers.ListField(child=serializers.CharField(),
+                             source="risfunding_status_in", required=False, default=list)
 
     class Meta:
         model  = CollectionMapping
-        fields = [
-            # snake_case (direct)
-            "entity_type", "collection_id", "label",
-            "dc_type_includes", "risfunding_status_in", "sort_order",
-            # camelCase aliases
-            "entityType", "collectionId", "dcTypeIncludes", "risfundingStatusIn",
-        ]
+        fields = ["entity_type", "collection_id", "label",
+                  "dc_type_includes", "risfunding_status_in", "sort_order",
+                  "entityType", "collectionId", "dcTypeIncludes", "risfundingStatusIn"]
 
     def to_internal_value(self, data):
-        """
-        Pre-process the `conditions` nested object if supplied, then delegate.
-        Supports both:
-          { entity_type, collection_id, conditions: { dcTypeIncludes, risfundingStatusIn } }
-          { entityType, collectionId, dc_type_includes, risfunding_status_in }
-        """
         data = data.copy() if hasattr(data, "copy") else dict(data)
         conditions = data.pop("conditions", None)
         if isinstance(conditions, dict):
-            if "dcTypeIncludes" in conditions:
-                data.setdefault("dcTypeIncludes", conditions["dcTypeIncludes"])
-            if "risfundingStatusIn" in conditions:
-                data.setdefault("risfundingStatusIn", conditions["risfundingStatusIn"])
-            # also accept snake_case inside conditions
-            if "dc_type_includes" in conditions:
-                data.setdefault("dc_type_includes", conditions["dc_type_includes"])
-            if "risfunding_status_in" in conditions:
-                data.setdefault("risfunding_status_in", conditions["risfunding_status_in"])
+            for k, snake in [("dcTypeIncludes", "dcTypeIncludes"),
+                              ("risfundingStatusIn", "risfundingStatusIn"),
+                              ("dc_type_includes", "dc_type_includes"),
+                              ("risfunding_status_in", "risfunding_status_in")]:
+                if k in conditions:
+                    data.setdefault(k, conditions[k])
         return super().to_internal_value(data)
 
 
@@ -174,11 +148,10 @@ class SubmissionFormFieldSerializer(serializers.ModelSerializer):
         ]
 
     def get_child_form_name_resolved(self, obj):
-        """Return the child form's name if the FK is set."""
         return obj.child_form.name if obj.child_form_id else obj.child_form_name or None
 
 class SubmissionFormSerializer(serializers.ModelSerializer):
-    fields = SubmissionFormFieldSerializer(many=True, read_only=True)
+    fields      = SubmissionFormFieldSerializer(many=True, read_only=True)
     field_count = serializers.IntegerField(source="fields.count", read_only=True)
     class Meta:
         model  = SubmissionForm
@@ -187,10 +160,10 @@ class SubmissionFormSerializer(serializers.ModelSerializer):
 class SubmissionFormListSerializer(serializers.ModelSerializer):
     field_count          = serializers.IntegerField(source="fields.count", read_only=True)
     required_field_count = serializers.SerializerMethodField()
-
     class Meta:
         model  = SubmissionForm
-        fields = ["id", "name", "contains_required", "required_field_count", "field_count", "imported_at"]
+        fields = ["id", "name", "contains_required", "required_field_count",
+                  "field_count", "imported_at"]
 
     def get_required_field_count(self, obj):
         return obj.fields.filter(is_required=True).count()
@@ -205,12 +178,11 @@ class SubmissionStepDefinitionSerializer(serializers.ModelSerializer):
                   "mandatory", "scope", "imported_at"]
 
 class SubmissionProcessStepSerializer(serializers.ModelSerializer):
-    """One step reference within a process, with resolved definition data."""
-    type             = serializers.CharField(source="definition.type",      read_only=True, default=None)
-    mandatory        = serializers.BooleanField(source="definition.mandatory", read_only=True, default=True)
-    heading          = serializers.CharField(source="definition.heading",   read_only=True, default="")
-    processing_class = serializers.CharField(source="definition.processing_class",
-                                             read_only=True, default="")
+    """One step inside a process, with resolved definition fields."""
+    type             = serializers.CharField(source="definition.type",             read_only=True, default=None)
+    mandatory        = serializers.BooleanField(source="definition.mandatory",     read_only=True, default=True)
+    heading          = serializers.CharField(source="definition.heading",          read_only=True, default="")
+    processing_class = serializers.CharField(source="definition.processing_class", read_only=True, default="")
 
     class Meta:
         model  = SubmissionProcessStep
@@ -220,14 +192,12 @@ class SubmissionProcessStepSerializer(serializers.ModelSerializer):
 class SubmissionProcessSerializer(serializers.ModelSerializer):
     steps      = SubmissionProcessStepSerializer(many=True, read_only=True)
     step_count = serializers.IntegerField(source="steps.count", read_only=True)
-
     class Meta:
         model  = SubmissionProcess
         fields = ["id", "name", "step_count", "steps", "imported_at"]
 
 class SubmissionProcessListSerializer(serializers.ModelSerializer):
     step_count = serializers.IntegerField(source="steps.count", read_only=True)
-
     class Meta:
         model  = SubmissionProcess
         fields = ["id", "name", "step_count", "imported_at"]

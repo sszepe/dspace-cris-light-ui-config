@@ -34,12 +34,20 @@ urlpatterns = [
     path("quickpresets/<int:preset_id>/filters/", views.QuickPresetFilterCreateView.as_view(),    name="quickpreset-filter-create"),
     path("quickpreset-filters/<int:pk>/",         views.QuickPresetFilterDetailView.as_view(),    name="quickpreset-filter-detail"),
 
-    # ── Submission forms (read-only, populated by import_plain_config) ────────
+    # ── Submission forms ──────────────────────────────────────────────────────
+    # IMPORTANT: "export/" and "fields/" must come BEFORE <int:pk>/ so the
+    # string literals are never captured as integer primary keys.
+    path("submission-forms/export/",              views.SubmissionFormExportView.as_view(),       name="submission-form-export"),
+    path("submission-forms/fields/<int:pk>/",     views.SubmissionFormFieldDetailView.as_view(),  name="submission-form-field-detail"),
     path("submission-forms/",                     views.SubmissionFormListView.as_view(),         name="submission-form-list"),
     path("submission-forms/<int:pk>/",            views.SubmissionFormDetailView.as_view(),       name="submission-form-detail"),
     path("submission-forms/<int:form_id>/fields/",views.SubmissionFormFieldListView.as_view(),    name="submission-form-fields"),
 
-    # ── Submission processes (read-only, populated by import_plain_config) ───
+    # ── Submission processes ──────────────────────────────────────────────────
+    # IMPORTANT: "export/" and "submission-process-steps/" must come BEFORE
+    # the <int:pk>/ patterns for the same reason as above.
+    path("submission-processes/export/",          views.SubmissionProcessExportView.as_view(),        name="submission-process-export"),
+    path("submission-process-steps/<int:pk>/",    views.SubmissionProcessStepDetailView.as_view(),    name="submission-process-step-detail"),
     path("submission-step-definitions/",          views.SubmissionStepDefinitionListView.as_view(),   name="submission-step-definition-list"),
     path("submission-step-definitions/<int:pk>/", views.SubmissionStepDefinitionDetailView.as_view(), name="submission-step-definition-detail"),
     path("submission-processes/",                 views.SubmissionProcessListView.as_view(),           name="submission-process-list"),

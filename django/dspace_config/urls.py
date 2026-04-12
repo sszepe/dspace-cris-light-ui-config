@@ -24,7 +24,7 @@ urlpatterns = [
     path("api/dspace-config/", include("api.urls")),
 
     # ── DSpace CRSI Layout ─────────────────────────────────────────────────────
-    path("api/dspace-config/cris-layout/", include("cris_layout.urls")),
+    path("api/cris-layout/", include("cris_layout.urls")),
 
     # ── OpenAPI schema ─────────────────────────────────────────────────────
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
