@@ -360,27 +360,36 @@ class CrisLayoutMetadataGroupDetailView(APIView):
 class CrisLayoutExportView(APIView):
     """GET /cris-layout/export/ — download the current layout as XLSX."""
     permission_classes = [IsAuthenticated]
-
+ 
     def get(self, request):
+        import io
+        import tempfile
+        from pathlib import Path
+        from django.core.management import call_command
+        from django.http import HttpResponse
+ 
         entity = request.query_params.get("entity", "")
+ 
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
             tmp_path = tmp.name
-
-        # Call the export management command programmatically
-        from django.core.management import call_command
-        kwargs = {"output_file": tmp_path, "stdout": io.StringIO()}
-        if entity:
-            kwargs["entity"] = entity
-        call_command("export_cris_layout", **kwargs)
-
-        with open(tmp_path, "rb") as f:
-            content = f.read()
-        Path(tmp_path).unlink(missing_ok=True)
-
-        filename = f"cris-layout-configuration.xlsx"
+ 
+        try:
+            # Positional args go as positional to call_command;
+            # optional --flags go as keyword args.
+            kwargs = {"stdout": io.StringIO()}
+            if entity:
+                kwargs["entity"] = entity
+ 
+            call_command("export_cris_layout", tmp_path, **kwargs)
+ 
+            with open(tmp_path, "rb") as f:
+                content = f.read()
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+ 
         response = HttpResponse(
             content,
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Content-Disposition"] = 'attachment; filename="cris-layout-configuration.xlsx"'
         return response

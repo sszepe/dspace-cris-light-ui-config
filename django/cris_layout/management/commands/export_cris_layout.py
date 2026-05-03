@@ -21,23 +21,24 @@ from django.core.management.base import BaseCommand, CommandError
 try:
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    HEADER_FILL = PatternFill("solid", start_color="003b79", end_color="003b79")
+    HEADER_FONT = Font(bold=True, color="FFFFFF", name="Arial", size=10)
+    BODY_FONT   = Font(name="Arial", size=10)
+    ALT_FILL    = PatternFill("solid", start_color="EEF4FB", end_color="EEF4FB")
+    BORDER_SIDE = Side(style="thin", color="C3D5E8")
+    THIN_BORDER = Border(
+        left=BORDER_SIDE, right=BORDER_SIDE, top=BORDER_SIDE, bottom=BORDER_SIDE
+    )
 except ImportError:
     openpyxl = None  # type: ignore
+    HEADER_FILL = HEADER_FONT = BODY_FONT = ALT_FILL = BORDER_SIDE = THIN_BORDER = None  # type: ignore
 
 from cris_layout.models import (
     CrisLayoutTab, CrisLayoutTab2Box, CrisLayoutBox,
     CrisLayoutBox2Metadata, CrisLayoutBox2Metrics,
     CrisLayoutBox2Vocabulary, CrisLayoutMetadataGroup,
     CrisLayoutTabPolicy, CrisLayoutBoxPolicy,
-)
-
-HEADER_FILL = PatternFill("solid", start_color="003b79", end_color="003b79")
-HEADER_FONT = Font(bold=True, color="FFFFFF", name="Arial", size=10)
-BODY_FONT   = Font(name="Arial", size=10)
-ALT_FILL    = PatternFill("solid", start_color="EEF4FB", end_color="EEF4FB")
-BORDER_SIDE = Side(style="thin", color="C3D5E8")
-THIN_BORDER = Border(
-    left=BORDER_SIDE, right=BORDER_SIDE, top=BORDER_SIDE, bottom=BORDER_SIDE
 )
 
 
