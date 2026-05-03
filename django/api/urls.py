@@ -53,6 +53,15 @@ urlpatterns = [
     path("submission-processes/",                 views.SubmissionProcessListView.as_view(),           name="submission-process-list"),
     path("submission-processes/<int:pk>/",        views.SubmissionProcessDetailView.as_view(),         name="submission-process-detail"),
 
+    # ── Value pairs ───────────────────────────────────────────────────────────
+    path("value-pair-sets/",                      views.ValuePairSetListCreate.as_view()),
+    path("value-pair-sets/export-xml/",           views.ValuePairSetExportXml.as_view()),
+    path("value-pair-sets/export-ts/",            views.ValuePairSetExportTs.as_view()),
+    path("value-pair-sets/<int:pk>/",             views.ValuePairSetDetail.as_view()),
+    path("value-pair-sets/<int:pk>/replace-pairs/", views.ValuePairSetReplacePairs.as_view()),
+    path("value-pairs/",                          views.ValuePairListCreate.as_view()),
+    path("value-pairs/<int:pk>/",                 views.ValuePairDetail.as_view()),
+
     # ── Form layouts ──────────────────────────────────────────────────────────
     path("form-layouts/",                         views.FormLayoutListCreateView.as_view(),       name="form-layout-list"),
     path("form-layouts/<int:pk>/",                views.FormLayoutDetailView.as_view(),           name="form-layout-detail"),

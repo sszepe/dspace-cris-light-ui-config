@@ -16,6 +16,7 @@ from .models import (
     SubmissionForm, SubmissionFormField,
     SubmissionStepDefinition, SubmissionProcess, SubmissionProcessStep,
     FormLayout, FormSection, FormFieldOverride, FormConditionalBlock,
+    SubmissionValuePairSet, SubmissionValuePair,
 )
 from .serializers import (
     EntityClusterSerializer, EntityClusterWriteSerializer,
@@ -30,6 +31,9 @@ from .serializers import (
     SubmissionProcessStepSerializer,
     FormLayoutSerializer, FormLayoutWriteSerializer,
     FormSectionSerializer, FormFieldOverrideSerializer, FormConditionalBlockSerializer,
+    SubmissionValuePairSetSerializer,
+    SubmissionValuePairSetListSerializer,
+    SubmissionValuePairSerializer,
 )
 
 
@@ -38,6 +42,14 @@ def is_admin(request) -> bool:
     if hasattr(user, "is_staff"):
         return bool(user.is_staff or getattr(user, "is_superuser", False))
     return bool(getattr(user, "is_admin", False))
+
+
+def _esc(s: str) -> str:
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+def _ts_esc(s: str) -> str:
+    return (s or "").replace("\\", "\\\\").replace('"', '\\"')
 
 
 # ── Auth diagnostic ────────────────────────────────────────────────────────────
@@ -527,3 +539,281 @@ class AuditFormsSummaryView(APIView):
         return Response(list(forms))
 
 audit_forms_summary = AuditFormsSummaryView.as_view()
+
+class DiscoveryXmlExportView(APIView):
+    """
+    GET /api/dspace-config/discovery-xml/
+    Returns discovery.xml patched with all QuickPreset facets as bean
+    definitions registered in defaultConfiguration.
+    Requires DISCOVERY_XML_BASE in Django settings.
+    """
+    permission_classes = [IsAuthenticated]
+ 
+    def get(self, request):
+        import io as _io
+        import tempfile as _tmp
+        from pathlib import Path as _Path
+        from django.conf import settings as _settings
+        from django.core.management import call_command
+        from django.http import HttpResponse
+ 
+        base_file = request.query_params.get("base", "")
+        if not base_file:
+            base_file = getattr(_settings, "DISCOVERY_XML_BASE", "")
+ 
+        if not base_file or not _Path(base_file).exists():
+            return Response(
+                {"detail": (
+                    f"Base discovery.xml not found at '{base_file}'. "
+                    "Set DISCOVERY_XML_BASE in settings.py or pass ?base=/path."
+                )},
+                status=400,
+            )
+ 
+        with _tmp.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
+            tmp_path = tmp.name
+ 
+        call_command(
+            "export_discovery_xml",
+            base_file=base_file,
+            output_file=tmp_path,
+            stdout=_io.StringIO(),
+            stderr=_io.StringIO(),
+        )
+ 
+        content = _Path(tmp_path).read_bytes()
+        _Path(tmp_path).unlink(missing_ok=True)
+ 
+        response = HttpResponse(content, content_type="application/xml")
+        response["Content-Disposition"] = 'attachment; filename="discovery.xml"'
+        return response
+
+# ── Key Value Pairs ─────────────────────────────────────────────────────────
+
+def _get_set_or_404(pk: int) -> SubmissionValuePairSet:
+    try:
+        return SubmissionValuePairSet.objects.prefetch_related("pairs").get(pk=pk)
+    except SubmissionValuePairSet.DoesNotExist:
+        from rest_framework.exceptions import NotFound
+        raise NotFound(f"Value-pair set {pk} not found.")
+
+
+def _get_pair_or_404(pk: int) -> SubmissionValuePair:
+    try:
+        return SubmissionValuePair.objects.select_related("pair_set").get(pk=pk)
+    except SubmissionValuePair.DoesNotExist:
+        from rest_framework.exceptions import NotFound
+        raise NotFound(f"Value pair {pk} not found.")
+
+
+class ValuePairSetListCreate(APIView):
+    """
+    GET  /value-pair-sets/   — list all sets (lightweight, no pairs array)
+    POST /value-pair-sets/   — create a new set
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        sets = SubmissionValuePairSet.objects.prefetch_related("pairs").all()
+        serializer = SubmissionValuePairSetListSerializer(sets, many=True)
+        return Response(serializer.data)
+
+    def post(self, request: Request) -> Response:
+        serializer = SubmissionValuePairSetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ValuePairSetDetail(APIView):
+    """
+    GET    /value-pair-sets/{pk}/  — retrieve a set with its full pairs array
+    PATCH  /value-pair-sets/{pk}/  — update set metadata (name, dc_term, note)
+    DELETE /value-pair-sets/{pk}/  — delete set and cascade-delete all its pairs
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request, pk: int) -> Response:
+        obj = _get_set_or_404(pk)
+        return Response(SubmissionValuePairSetSerializer(obj).data)
+
+    def patch(self, request: Request, pk: int) -> Response:
+        obj = _get_set_or_404(pk)
+        serializer = SubmissionValuePairSetSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request: Request, pk: int) -> Response:
+        obj = _get_set_or_404(pk)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ValuePairSetReplacePairs(APIView):
+    """
+    POST /value-pair-sets/{pk}/replace-pairs/
+
+    Body: {"pairs": [{"displayed_value": "…", "stored_value": "…"}, …]}
+
+    Atomically replaces all pairs for the set.  Returns the updated set
+    (with the new pairs array) so the frontend can re-sync without an
+    extra round-trip.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, pk: int) -> Response:
+        obj = _get_set_or_404(pk)
+        raw_pairs = request.data.get("pairs")
+        if not isinstance(raw_pairs, list):
+            return Response(
+                {"error": "'pairs' must be a JSON array."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            obj.pairs.all().delete()
+            for i, p in enumerate(raw_pairs):
+                SubmissionValuePair.objects.create(
+                    pair_set=obj,
+                    sort_order=i,
+                    displayed_value=str(p.get("displayed_value", "")),
+                    stored_value=str(p.get("stored_value", "")),
+                )
+
+        # Re-fetch to get fresh prefetch
+        obj.refresh_from_db()
+        obj = _get_set_or_404(pk)
+        return Response(SubmissionValuePairSetSerializer(obj).data)
+
+
+class ValuePairSetExportXml(APIView):
+    """
+    GET /value-pair-sets/export-xml/
+
+    Downloads all value-pair sets as a <form-value-pairs> XML block
+    suitable for embedding in submission-forms.xml.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> HttpResponse:
+        lines = ['<?xml version="1.0" encoding="UTF-8"?>', "<form-value-pairs>"]
+        for vps in SubmissionValuePairSet.objects.prefetch_related("pairs").all():
+            dc = f' dc-term="{_esc(vps.dc_term)}"' if vps.dc_term else ""
+            lines.append(f'  <value-pairs value-pairs-name="{_esc(vps.name)}"{dc}>')
+            for pair in vps.pairs.all():
+                lines.append("    <pair>")
+                lines.append(f"      <displayed-value>{_esc(pair.displayed_value)}</displayed-value>")
+                lines.append(f"      <stored-value>{_esc(pair.stored_value)}</stored-value>")
+                lines.append("    </pair>")
+            lines.append("  </value-pairs>")
+        lines.append("</form-value-pairs>")
+
+        resp = HttpResponse("\n".join(lines), content_type="application/xml; charset=utf-8")
+        resp["Content-Disposition"] = 'attachment; filename="submission-value-pairs.xml"'
+        return resp
+
+
+class ValuePairSetExportTs(APIView):
+    """
+    GET /value-pair-sets/export-ts/
+
+    Downloads the SUBMISSION_VALUE_PAIRS TypeScript constant — drop this
+    file into the dspace-cris frontend as submission-value-pairs.tsx.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> HttpResponse:
+        lines = [
+            "// Auto-generated by DSpace CRIS Config Cockpit",
+            "// Replace submission-value-pairs.tsx in the dspace-cris frontend with this file.",
+            "",
+            "export type SubmissionValuePair = {",
+            "  displayedValue?: string;",
+            "  storedValue?: string;",
+            "};",
+            "",
+            "export type SubmissionValuePairsConfig = {",
+            "  name: string;",
+            "  dcTerm?: string;",
+            "  pairs: SubmissionValuePair[];",
+            "};",
+            "",
+            "export const SUBMISSION_VALUE_PAIRS:"
+            " Record<string, SubmissionValuePairsConfig> = {",
+        ]
+        sets = list(SubmissionValuePairSet.objects.prefetch_related("pairs").all())
+        for i, vps in enumerate(sets):
+            trailing = "," if i < len(sets) - 1 else ""
+            lines.append(f"  {vps.name}: {{")
+            lines.append(f'    name: "{_ts_esc(vps.name)}",')
+            if vps.dc_term:
+                lines.append(f'    dcTerm: "{_ts_esc(vps.dc_term)}",')
+            lines.append("    pairs: [")
+            pairs = list(vps.pairs.all())
+            for j, pair in enumerate(pairs):
+                pair_trailing = "," if j < len(pairs) - 1 else ""
+                lines.append(
+                    f'      {{ displayedValue: "{_ts_esc(pair.displayed_value)}",'
+                    f' storedValue: "{_ts_esc(pair.stored_value)}" }}{pair_trailing}'
+                )
+            lines.append("    ],")
+            lines.append(f"  }}{trailing}")
+        lines.extend([
+            "};",
+            "",
+            "export function getSubmissionValuePairs(",
+            "  name: string,",
+            "): SubmissionValuePairsConfig | undefined {",
+            "  return SUBMISSION_VALUE_PAIRS[name];",
+            "}",
+        ])
+
+        resp = HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
+        resp["Content-Disposition"] = 'attachment; filename="submission-value-pairs.tsx"'
+        return resp
+
+
+class ValuePairListCreate(APIView):
+    """
+    GET  /value-pairs/?set=<id>  — list pairs for a given set
+    POST /value-pairs/           — create a single pair
+                                   Body: {pair_set, displayed_value, stored_value, sort_order}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        qs = SubmissionValuePair.objects.select_related("pair_set")
+        set_id = request.query_params.get("set")
+        if set_id:
+            qs = qs.filter(pair_set_id=set_id)
+        return Response(SubmissionValuePairSerializer(qs, many=True).data)
+
+    def post(self, request: Request) -> Response:
+        serializer = SubmissionValuePairSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ValuePairDetail(APIView):
+    """
+    GET    /value-pairs/{pk}/  — retrieve a single pair
+    PATCH  /value-pairs/{pk}/  — update displayed_value / stored_value / sort_order
+    DELETE /value-pairs/{pk}/  — remove the pair
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request, pk: int) -> Response:
+        return Response(SubmissionValuePairSerializer(_get_pair_or_404(pk)).data)
+
+    def patch(self, request: Request, pk: int) -> Response:
+        pair = _get_pair_or_404(pk)
+        serializer = SubmissionValuePairSerializer(pair, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request: Request, pk: int) -> Response:
+        _get_pair_or_404(pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

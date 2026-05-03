@@ -8,6 +8,7 @@ from .models import (
     SubmissionForm, SubmissionFormField,
     SubmissionStepDefinition, SubmissionProcess, SubmissionProcessStep,
     FormLayout, FormSection, FormFieldOverride, FormConditionalBlock,
+    SubmissionValuePairSet, SubmissionValuePair,
 )
 
 
@@ -234,3 +235,27 @@ class FormLayoutAdmin(admin.ModelAdmin):
     list_filter  = ["profile"]
     search_fields = ["form_name", "label"]
     inlines      = [FormSectionInline, FormConditionalBlockInline]
+
+
+# ── Value pairs ──────────────────────────────────────────────────────────────
+
+@admin.register(SubmissionValuePairSet)
+class SubmissionValuePairSetAdmin(admin.ModelAdmin):
+    list_display = ["name", "dc_term", "note", "imported_at", "updated_at"]
+    search_fields = ["name", "dc_term", "note"]
+    inlines = [
+        type("SubmissionValuePairInline", (admin.TabularInline,), {
+            "model": SubmissionValuePair,
+            "extra": 0,
+            "fields": ["sort_order", "displayed_value", "stored_value"],
+            "ordering": ["sort_order"],
+        }),
+    ]
+
+@admin.register(SubmissionValuePair)
+class SubmissionValuePairAdmin(admin.ModelAdmin):
+    list_display = ["pair_set", "displayed_value", "stored_value"]
+    search_fields = ["displayed_value", "stored_value"]
+    list_filter = ["pair_set"]
+    ordering = ["pair_set", "sort_order"]
+    readonly_fields = ["pair_set", "sort_order", "displayed_value", "stored_value"]

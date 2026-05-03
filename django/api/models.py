@@ -288,3 +288,50 @@ class FormConditionalBlock(models.Model):
     revealed_fields  = models.JSONField(default=list)
     revealed_section = models.CharField(max_length=100, blank=True, default="")
     class Meta: ordering = ["sort_order"]
+
+# ── Key Value pairs ────────────────────────────────────────────────────────────
+
+class SubmissionValuePairSet(models.Model):
+    """
+    A named set of key/value pairs used by dropdown and qualdrop_value fields
+    in DSpace submission forms (e.g. common_iso_languages, gender, orgunit_types).
+
+    Maps to <value-pairs value-pairs-name="..." dc-term="..."> in submission-forms.xml
+    and to an entry in SUBMISSION_VALUE_PAIRS in submission-value-pairs.tsx.
+    """
+    name     = models.CharField(max_length=200, unique=True,
+                                help_text='Value pairs name (e.g. "common_iso_languages")')
+    dc_term  = models.CharField(max_length=200, blank=True,
+                                help_text='dc-term attribute from submission-forms.xml')
+    note     = models.TextField(blank=True, help_text="Optional description / notes")
+    imported_at = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Submission value-pair set"
+        verbose_name_plural = "Submission value-pair sets"
+
+    def __str__(self):
+        return self.name
+
+
+class SubmissionValuePair(models.Model):
+    """
+    A single displayed-value / stored-value pair within a SubmissionValuePairSet.
+    Maps to <pair><displayed-value>…</displayed-value><stored-value>…</stored-value></pair>.
+    """
+    pair_set       = models.ForeignKey(
+        SubmissionValuePairSet, on_delete=models.CASCADE, related_name="pairs"
+    )
+    sort_order     = models.PositiveIntegerField(default=0)
+    displayed_value = models.CharField(max_length=500)
+    stored_value   = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+        verbose_name = "Submission value pair"
+        verbose_name_plural = "Submission value pairs"
+
+    def __str__(self):
+        return f"{self.pair_set.name}: {self.displayed_value} → {self.stored_value}"

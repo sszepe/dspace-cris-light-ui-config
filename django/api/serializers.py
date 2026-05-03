@@ -4,6 +4,7 @@ from .models import (
     QuickPreset, QuickPresetFilter, SiteSettings,
     CollectionMapping,
     MetadataSchema, MetadataField,
+    SubmissionValuePairSet, SubmissionValuePair,
     SubmissionForm, SubmissionFormField,
     SubmissionStepDefinition, SubmissionProcess, SubmissionProcessStep,
     FormLayout, FormSection, FormFieldOverride, FormConditionalBlock,
@@ -235,3 +236,38 @@ class FormLayoutWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model  = FormLayout
         fields = ["form_name", "profile", "collection", "label"]
+
+
+# ── Key Value pairs ────────────────────────────────────────────────────────────
+
+class SubmissionValuePairSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = SubmissionValuePair
+        fields = ["id", "sort_order", "displayed_value", "stored_value"]
+ 
+ 
+class SubmissionValuePairSetSerializer(serializers.ModelSerializer):
+    pairs = SubmissionValuePairSerializer(many=True, read_only=True)
+    pair_count = serializers.SerializerMethodField()
+ 
+    class Meta:
+        model  = SubmissionValuePairSet
+        fields = ["id", "name", "dc_term", "note", "pair_count", "pairs",
+                  "imported_at", "updated_at"]
+ 
+    def get_pair_count(self, obj):
+        return obj.pairs.count()
+ 
+ 
+class SubmissionValuePairSetListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for list views (no pairs array)."""
+    pair_count = serializers.SerializerMethodField()
+ 
+    class Meta:
+        model  = SubmissionValuePairSet
+        fields = ["id", "name", "dc_term", "note", "pair_count",
+                  "imported_at", "updated_at"]
+ 
+    def get_pair_count(self, obj):
+        return obj.pairs.count()
+ 
